@@ -1,8 +1,9 @@
+
 <!DOCTYPE html>
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Upgraded Shooter</title>
+<title>Wave Shooter</title>
 <style>
   body {
     margin: 0;
@@ -39,38 +40,63 @@ let keys = {};
 let bullets = [];
 let enemies = [];
 let boss = null;
+let superBosses = [];
+
+let wave = 1;
 
 // Damage cooldowns
 let smallHitCooldown = 0;
 let bossHitCooldown = 0;
+let superBossHitCooldown = 0;
 
-// Shooting cooldown (now unlimited)
+// Shooting cooldown (max speed)
 let shootCooldown = 0;
 
 document.addEventListener("keydown", e => keys[e.key.toLowerCase()] = true);
 document.addEventListener("keyup", e => keys[e.key.toLowerCase()] = false);
 
 // Spawn enemies + boss
-function spawnEnemies() {
+function spawnWave() {
   enemies = [];
-  for (let i = 0; i < 20; i++) {
-    enemies.push({
+  superBosses = [];
+
+  // Normal waves
+  if (wave <= 3) {
+    for (let i = 0; i < 20 + wave * 5; i++) {
+      enemies.push({
+        x: Math.random() * canvas.width,
+        y: Math.random() * canvas.height,
+        alive: true
+      });
+    }
+
+    boss = {
       x: Math.random() * canvas.width,
       y: Math.random() * canvas.height,
-      alive: true
-    });
+      alive: true,
+      size: 60
+    };
   }
 
-  boss = {
-    x: Math.random() * canvas.width,
-    y: Math.random() * canvas.height,
-    alive: true,
-    size: 60
-  };
-}
-spawnEnemies();
+  // SUPER WAVE (after wave 3)
+  if (wave > 3) {
+    boss = null;
 
-// Full auto shooting (max speed)
+    // Spawn “billions” (actually hundreds per second)
+    for (let i = 0; i < 200; i++) {
+      superBosses.push({
+        x: Math.random() * canvas.width,
+        y: Math.random() * canvas.height,
+        alive: true,
+        size: 50
+      });
+    }
+  }
+}
+
+spawnWave();
+
+// Full auto shooting
 function shoot() {
   bullets.push({
     x: px,
@@ -81,7 +107,6 @@ function shoot() {
 }
 
 function update() {
-  // Faster movement
   const speed = 5;
 
   // Movement
@@ -94,8 +119,8 @@ function update() {
   if (keys["arrowleft"]) angle -= 0.12;
   if (keys["arrowright"]) angle += 0.12;
 
-  // Infinite healing
-  if (keys[" "]) hp += 10;
+  // Healing buff
+  if (keys[" "]) hp += 500;
 
   // Max fire rate
   if (keys["f"]) shoot();
@@ -106,7 +131,7 @@ function update() {
     b.y += b.dy;
   });
 
-  // Enemy movement
+  // Small enemy movement
   enemies.forEach(e => {
     if (!e.alive) return;
     const dx = px - e.x;
@@ -129,6 +154,18 @@ function update() {
     }
   }
 
+  // SUPER BOSS movement
+  superBosses.forEach(sb => {
+    if (!sb.alive) return;
+    const dx = px - sb.x;
+    const dy = py - sb.y;
+    const dist = Math.hypot(dx, dy);
+    if (dist > 10) {
+      sb.x += dx / dist * 2.5;
+      sb.y += dy / dist * 2.5;
+    }
+  });
+
   // Bullet collision
   bullets.forEach(b => {
     enemies.forEach(e => {
@@ -143,30 +180,57 @@ function update() {
         boss.alive = false;
       }
     }
+
+    superBosses.forEach(sb => {
+      if (!sb.alive) return;
+      if (Math.hypot(b.x - sb.x, b.y - sb.y) < sb.size) {
+        sb.alive = false;
+      }
+    });
   });
 
-  // SMALL ENEMY DAMAGE (500 dmg, 2s cooldown)
+  // SMALL ENEMY DAMAGE (500 dmg, 2s cd)
   if (smallHitCooldown <= 0) {
     enemies.forEach(e => {
       if (!e.alive) return;
       if (Math.hypot(px - e.x, py - e.y) < 20) {
         hp -= 500;
-        smallHitCooldown = 120; // 2 seconds
+        smallHitCooldown = 120;
       }
     });
   } else smallHitCooldown--;
 
-  // BOSS DAMAGE (1000 dmg, 2s cooldown)
+  // BOSS DAMAGE (1000 dmg, 2s cd)
   if (boss && boss.alive && bossHitCooldown <= 0) {
     if (Math.hypot(px - boss.x, py - boss.y) < boss.size) {
       hp -= 1000;
-      bossHitCooldown = 120; // 2 seconds
+      bossHitCooldown = 120;
     }
   } else bossHitCooldown--;
 
-  // Respawn everything
-  if (enemies.every(e => !e.alive) && (!boss || !boss.alive)) {
-    spawnEnemies();
+  // SUPER BOSS DAMAGE (2000 dmg, 2s cd)
+  if (superBossHitCooldown <= 0) {
+    superBosses.forEach(sb => {
+      if (!sb.alive) return;
+      if (Math.hypot(px - sb.x, py - sb.y) < sb.size) {
+        hp -= 2000;
+        superBossHitCooldown = 120;
+      }
+    });
+  } else superBossHitCooldown--;
+
+  // Check wave clear
+  const allSmallDead = enemies.every(e => !e.alive);
+  const bossDead = !boss || !boss.alive;
+  const allSuperDead = superBosses.every(sb => !sb.alive);
+
+  if (wave <= 3 && allSmallDead && bossDead) {
+    wave++;
+    spawnWave();
+  }
+
+  if (wave > 3 && allSuperDead) {
+    spawnWave();
   }
 }
 
@@ -185,7 +249,7 @@ function drawPlayer() {
 function draw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  // Enemies
+  // Small enemies
   enemies.forEach(e => {
     if (!e.alive) return;
     ctx.fillStyle = "red";
@@ -200,6 +264,15 @@ function draw() {
     ctx.fill();
   }
 
+  // SUPER BOSSES
+  superBosses.forEach(sb => {
+    if (!sb.alive) return;
+    ctx.fillStyle = "blue";
+    ctx.beginPath();
+    ctx.arc(sb.x, sb.y, sb.size, 0, Math.PI * 2);
+    ctx.fill();
+  });
+
   // Bullets
   ctx.fillStyle = "black";
   bullets.forEach(b => {
@@ -208,10 +281,11 @@ function draw() {
 
   drawPlayer();
 
-  // HP
+  // HP + Wave
   ctx.fillStyle = "black";
   ctx.font = "20px Arial";
   ctx.fillText("HP: " + hp, 20, 30);
+  ctx.fillText("Wave: " + wave, 20, 60);
 }
 
 function loop() {
