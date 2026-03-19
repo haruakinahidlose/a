@@ -40,11 +40,11 @@ let bullets = [];
 let enemies = [];
 let boss = null;
 
-// COOLDOWNS
+// Damage cooldowns
 let smallHitCooldown = 0;
 let bossHitCooldown = 0;
 
-// SHOOTING — now unlimited speed
+// Shooting cooldown (now unlimited)
 let shootCooldown = 0;
 
 document.addEventListener("keydown", e => keys[e.key.toLowerCase()] = true);
@@ -70,7 +70,7 @@ function spawnEnemies() {
 }
 spawnEnemies();
 
-// Full auto shooting (no cooldown)
+// Full auto shooting (max speed)
 function shoot() {
   bullets.push({
     x: px,
@@ -81,7 +81,7 @@ function shoot() {
 }
 
 function update() {
-  // FASTER SPEED
+  // Faster movement
   const speed = 5;
 
   // Movement
@@ -97,7 +97,7 @@ function update() {
   // Infinite healing
   if (keys[" "]) hp += 10;
 
-  // MAX FIRE RATE — shoots every frame
+  // Max fire rate
   if (keys["f"]) shoot();
 
   // Move bullets
@@ -145,22 +145,22 @@ function update() {
     }
   });
 
-  // Enemy damage
+  // SMALL ENEMY DAMAGE (500 dmg, 2s cooldown)
   if (smallHitCooldown <= 0) {
     enemies.forEach(e => {
       if (!e.alive) return;
       if (Math.hypot(px - e.x, py - e.y) < 20) {
-        hp -= 2;
-        smallHitCooldown = 600; // 10s
+        hp -= 500;
+        smallHitCooldown = 120; // 2 seconds
       }
     });
   } else smallHitCooldown--;
 
-  // Boss damage
+  // BOSS DAMAGE (1000 dmg, 2s cooldown)
   if (boss && boss.alive && bossHitCooldown <= 0) {
     if (Math.hypot(px - boss.x, py - boss.y) < boss.size) {
-      hp -= 20;
-      bossHitCooldown = 2400; // 40s
+      hp -= 1000;
+      bossHitCooldown = 120; // 2 seconds
     }
   } else bossHitCooldown--;
 
