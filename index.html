@@ -1,17 +1,17 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
 <meta charset="UTF-8">
-<title>nebula2</title>
+<title>Upgraded Shooter</title>
 <style>
   body {
     margin: 0;
-    background: #87CEEB; /* daytime sky */
     overflow: hidden;
+    background: #87CEEB;
   }
   canvas {
+    background: #7ecf5f;
     display: block;
-    background: #7ecf5f; /* grass */
   }
 </style>
 </head>
@@ -33,40 +33,56 @@ addEventListener("resize", resize);
 // Player
 let px = 300, py = 300;
 let angle = 0;
+let hp = 100;
+
 let keys = {};
 let bullets = [];
 let enemies = [];
+let boss = null;
+
+// COOLDOWNS
+let smallHitCooldown = 0;
+let bossHitCooldown = 0;
+
+// SHOOTING — now unlimited speed
 let shootCooldown = 0;
 
 document.addEventListener("keydown", e => keys[e.key.toLowerCase()] = true);
 document.addEventListener("keyup", e => keys[e.key.toLowerCase()] = false);
 
-// Spawn enemies
+// Spawn enemies + boss
 function spawnEnemies() {
   enemies = [];
-  for (let i = 0; i < 10; i++) {
+  for (let i = 0; i < 20; i++) {
     enemies.push({
       x: Math.random() * canvas.width,
       y: Math.random() * canvas.height,
       alive: true
     });
   }
+
+  boss = {
+    x: Math.random() * canvas.width,
+    y: Math.random() * canvas.height,
+    alive: true,
+    size: 60
+  };
 }
 spawnEnemies();
 
-// Full auto shooting
+// Full auto shooting (no cooldown)
 function shoot() {
   bullets.push({
     x: px,
     y: py,
-    dx: Math.cos(angle) * 6,
-    dy: Math.sin(angle) * 6
+    dx: Math.cos(angle) * 10,
+    dy: Math.sin(angle) * 10
   });
 }
 
-// Game loop
 function update() {
-  const speed = 3;
+  // FASTER SPEED
+  const speed = 5;
 
   // Movement
   if (keys["w"]) py -= speed;
@@ -74,18 +90,15 @@ function update() {
   if (keys["a"]) px -= speed;
   if (keys["d"]) px += speed;
 
-  // Aiming with arrow keys
-  if (keys["arrowleft"]) angle -= 0.1;
-  if (keys["arrowright"]) angle += 0.1;
+  // 360° aiming
+  if (keys["arrowleft"]) angle -= 0.12;
+  if (keys["arrowright"]) angle += 0.12;
 
-  // Full auto
-  if (keys["f"]) {
-    if (shootCooldown <= 0) {
-      shoot();
-      shootCooldown = 1; // lower = faster
-    }
-  }
-  if (shootCooldown > 0) shootCooldown--;
+  // Infinite healing
+  if (keys[" "]) hp += 10;
+
+  // MAX FIRE RATE — shoots every frame
+  if (keys["f"]) shoot();
 
   // Move bullets
   bullets.forEach(b => {
@@ -100,10 +113,21 @@ function update() {
     const dy = py - e.y;
     const dist = Math.hypot(dx, dy);
     if (dist > 5) {
-      e.x += dx / dist * 1.2;
-      e.y += dy / dist * 1.2;
+      e.x += dx / dist * 2;
+      e.y += dy / dist * 2;
     }
   });
+
+  // Boss movement
+  if (boss && boss.alive) {
+    const dx = px - boss.x;
+    const dy = py - boss.y;
+    const dist = Math.hypot(dx, dy);
+    if (dist > 10) {
+      boss.x += dx / dist * 1.2;
+      boss.y += dy / dist * 1.2;
+    }
+  }
 
   // Bullet collision
   bullets.forEach(b => {
@@ -113,10 +137,37 @@ function update() {
         e.alive = false;
       }
     });
+
+    if (boss && boss.alive) {
+      if (Math.hypot(b.x - boss.x, b.y - boss.y) < boss.size) {
+        boss.alive = false;
+      }
+    }
   });
 
-  // Respawn when all dead
-  if (enemies.every(e => !e.alive)) spawnEnemies();
+  // Enemy damage
+  if (smallHitCooldown <= 0) {
+    enemies.forEach(e => {
+      if (!e.alive) return;
+      if (Math.hypot(px - e.x, py - e.y) < 20) {
+        hp -= 2;
+        smallHitCooldown = 600; // 10s
+      }
+    });
+  } else smallHitCooldown--;
+
+  // Boss damage
+  if (boss && boss.alive && bossHitCooldown <= 0) {
+    if (Math.hypot(px - boss.x, py - boss.y) < boss.size) {
+      hp -= 20;
+      bossHitCooldown = 2400; // 40s
+    }
+  } else bossHitCooldown--;
+
+  // Respawn everything
+  if (enemies.every(e => !e.alive) && (!boss || !boss.alive)) {
+    spawnEnemies();
+  }
 }
 
 function drawPlayer() {
@@ -124,10 +175,9 @@ function drawPlayer() {
   ctx.translate(px, py);
   ctx.rotate(angle);
 
-  // Pixel stickman
   ctx.fillStyle = "#000";
-  ctx.fillRect(-5, -10, 10, 20); // body
-  ctx.fillRect(0, -2, 15, 4);    // gun
+  ctx.fillRect(-4, -10, 8, 20);
+  ctx.fillRect(0, -2, 18, 4);
 
   ctx.restore();
 }
@@ -135,20 +185,33 @@ function drawPlayer() {
 function draw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  // Draw enemies
+  // Enemies
   enemies.forEach(e => {
     if (!e.alive) return;
     ctx.fillStyle = "red";
     ctx.fillRect(e.x - 10, e.y - 10, 20, 20);
   });
 
-  // Draw bullets
+  // Boss
+  if (boss && boss.alive) {
+    ctx.fillStyle = "purple";
+    ctx.beginPath();
+    ctx.arc(boss.x, boss.y, boss.size, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Bullets
   ctx.fillStyle = "black";
   bullets.forEach(b => {
     ctx.fillRect(b.x - 3, b.y - 3, 6, 6);
   });
 
   drawPlayer();
+
+  // HP
+  ctx.fillStyle = "black";
+  ctx.font = "20px Arial";
+  ctx.fillText("HP: " + hp, 20, 30);
 }
 
 function loop() {
