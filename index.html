@@ -74,10 +74,12 @@ function spawnWave() {
     };
   }
 
+  // SUPER BOSS APOCALYPSE
   if (wave === 3) {
     boss = null;
 
-    for (let i = 0; i < 300; i++) {
+    // Spawn 6700 SUPER BOSSES
+    for (let i = 0; i < 6700; i++) {
       superBosses.push({
         x: Math.random() * canvas.width,
         y: Math.random() * canvas.height,
@@ -146,7 +148,7 @@ function update() {
     boss.y += dy / dist * 2.2;
   }
 
-  // SUPER BOSSES
+  // SUPER BOSSES (fast)
   superBosses.forEach(sb => {
     if (!sb.alive) return;
     const dx = px - sb.x;
