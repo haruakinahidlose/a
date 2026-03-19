@@ -1,8 +1,8 @@
-^<!DOCTYPE html>
+<!DOCTYPE html>
 <html>
 <head>
 <meta charset="UTF-8">
-<title>nebul2</title>
+<title>Wave Shooter</title>
 <style>
   body {
     margin: 0;
@@ -34,6 +34,7 @@ addEventListener("resize", resize);
 let px = 300, py = 300;
 let angle = 0;
 let hp = 100;
+let alive = true;
 
 let keys = {};
 let bullets = [];
@@ -48,20 +49,16 @@ let smallHitCooldown = 0;
 let bossHitCooldown = 0;
 let superBossHitCooldown = 0;
 
-// Shooting cooldown (max speed)
-let shootCooldown = 0;
-
 document.addEventListener("keydown", e => keys[e.key.toLowerCase()] = true);
 document.addEventListener("keyup", e => keys[e.key.toLowerCase()] = false);
 
-// Spawn enemies + boss
+// Spawn waves
 function spawnWave() {
   enemies = [];
   superBosses = [];
 
-  // Normal waves (1–3)
-  if (wave <= 3) {
-    for (let i = 0; i < 20 + wave * 5; i++) {
+  if (wave < 3) {
+    for (let i = 0; i < 25 + wave * 10; i++) {
       enemies.push({
         x: Math.random() * canvas.width,
         y: Math.random() * canvas.height,
@@ -77,11 +74,9 @@ function spawnWave() {
     };
   }
 
-  // SUPER BOSS APOCALYPSE (wave 4+)
-  if (wave > 3) {
+  if (wave === 3) {
     boss = null;
 
-    // Spawn “billions” (hundreds per wave so Safari doesn’t die)
     for (let i = 0; i < 300; i++) {
       superBosses.push({
         x: Math.random() * canvas.width,
@@ -106,20 +101,22 @@ function shoot() {
 }
 
 function update() {
-  const speed = 5;
+  if (!alive) return;
 
-  // Movement
+  // Player speed
+  const speed = 5 * 1.3;
+
   if (keys["w"]) py -= speed;
   if (keys["s"]) py += speed;
   if (keys["a"]) px -= speed;
   if (keys["d"]) px += speed;
 
-  // 360° aiming
-  if (keys["arrowleft"]) angle -= 0.12;
-  if (keys["arrowright"]) angle += 0.12;
+  // TURN RATE 2×
+  if (keys["arrowleft"]) angle -= 0.24;
+  if (keys["arrowright"]) angle += 0.24;
 
-  // Healing buff
-  if (keys[" "]) hp += 500;
+  // HEAL +670 HP
+  if (keys[" "]) hp += 670;
 
   // Max fire rate
   if (keys["f"]) shoot();
@@ -130,16 +127,14 @@ function update() {
     b.y += b.dy;
   });
 
-  // Small enemy movement
+  // Faster small enemies
   enemies.forEach(e => {
     if (!e.alive) return;
     const dx = px - e.x;
     const dy = py - e.y;
     const dist = Math.hypot(dx, dy);
-    if (dist > 5) {
-      e.x += dx / dist * 2;
-      e.y += dy / dist * 2;
-    }
+    e.x += dx / dist * 3;
+    e.y += dy / dist * 3;
   });
 
   // Boss movement
@@ -147,22 +142,18 @@ function update() {
     const dx = px - boss.x;
     const dy = py - boss.y;
     const dist = Math.hypot(dx, dy);
-    if (dist > 10) {
-      boss.x += dx / dist * 1.2;
-      boss.y += dy / dist * 1.2;
-    }
+    boss.x += dx / dist * 2.2;
+    boss.y += dy / dist * 2.2;
   }
 
-  // SUPER BOSS movement
+  // SUPER BOSSES
   superBosses.forEach(sb => {
     if (!sb.alive) return;
     const dx = px - sb.x;
     const dy = py - sb.y;
     const dist = Math.hypot(dx, dy);
-    if (dist > 10) {
-      sb.x += dx / dist * 2.5;
-      sb.y += dy / dist * 2.5;
-    }
+    sb.x += dx / dist * 3.5;
+    sb.y += dy / dist * 3.5;
   });
 
   // Bullet collision
@@ -218,17 +209,23 @@ function update() {
     });
   } else superBossHitCooldown--;
 
-  // Check wave clear
+  // DEATH FIX — stop at 0 HP
+  if (hp <= 0) {
+    hp = 0;
+    alive = false;
+  }
+
+  // Wave clear
   const allSmallDead = enemies.every(e => !e.alive);
   const bossDead = !boss || !boss.alive;
   const allSuperDead = superBosses.every(sb => !sb.alive);
 
-  if (wave <= 3 && allSmallDead && bossDead) {
+  if (wave < 3 && allSmallDead && bossDead) {
     wave++;
     spawnWave();
   }
 
-  if (wave > 3 && allSuperDead) {
+  if (wave === 3 && allSuperDead) {
     spawnWave();
   }
 }
@@ -282,9 +279,15 @@ function draw() {
 
   // HP + Wave
   ctx.fillStyle = "black";
-  ctx.font = "20px Arial";
+  ctx.font = "24px Arial";
   ctx.fillText("HP: " + hp, 20, 30);
   ctx.fillText("Wave: " + wave, 20, 60);
+
+  if (!alive) {
+    ctx.fillStyle = "black";
+    ctx.font = "60px Arial";
+    ctx.fillText("YOU DIED", canvas.width / 2 - 150, canvas.height / 2);
+  }
 }
 
 function loop() {
