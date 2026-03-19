@@ -1,9 +1,8 @@
-
-<!DOCTYPE html>
+^<!DOCTYPE html>
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Wave Shooter</title>
+<title>nebul2</title>
 <style>
   body {
     margin: 0;
@@ -60,7 +59,7 @@ function spawnWave() {
   enemies = [];
   superBosses = [];
 
-  // Normal waves
+  // Normal waves (1–3)
   if (wave <= 3) {
     for (let i = 0; i < 20 + wave * 5; i++) {
       enemies.push({
@@ -78,12 +77,12 @@ function spawnWave() {
     };
   }
 
-  // SUPER WAVE (after wave 3)
+  // SUPER BOSS APOCALYPSE (wave 4+)
   if (wave > 3) {
     boss = null;
 
-    // Spawn “billions” (actually hundreds per second)
-    for (let i = 0; i < 200; i++) {
+    // Spawn “billions” (hundreds per wave so Safari doesn’t die)
+    for (let i = 0; i < 300; i++) {
       superBosses.push({
         x: Math.random() * canvas.width,
         y: Math.random() * canvas.height,
