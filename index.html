@@ -6,56 +6,18 @@
 <style>
   body {
     margin: 0;
-    background: #000;
+    background: #87CEEB; /* daytime sky */
     overflow: hidden;
-    color: #fff;
-    font-family: Arial, sans-serif;
   }
   canvas {
     display: block;
-  }
-  #crosshair {
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    width: 20px;
-    height: 20px;
-    margin-left: -10px;
-    margin-top: -10px;
-    pointer-events: none;
-  }
-  #crosshair:before, #crosshair:after {
-    content: "";
-    position: absolute;
-    background: #fff;
-  }
-  #crosshair:before {
-    left: 9px;
-    top: 0;
-    width: 2px;
-    height: 20px;
-  }
-  #crosshair:after {
-    top: 9px;
-    left: 0;
-    width: 20px;
-    height: 2px;
-  }
-  #ui {
-    position: fixed;
-    top: 10px;
-    left: 50%;
-    transform: translateX(-50%);
-    text-shadow: 0 0 5px #000;
-    font-size: 14px;
+    background: #7ecf5f; /* grass */
   }
 </style>
 </head>
 <body>
 
 <canvas id="game"></canvas>
-<div id="crosshair"></div>
-<div id="ui">WASD = move • Arrows = aim • F = shoot</div>
 
 <script>
 const canvas = document.getElementById("game");
@@ -69,134 +31,129 @@ resize();
 addEventListener("resize", resize);
 
 // Player
-let px = 0, pz = 0;
+let px = 300, py = 300;
 let angle = 0;
 let keys = {};
-let score = 0;
+let bullets = [];
+let enemies = [];
+let shootCooldown = 0;
 
 document.addEventListener("keydown", e => keys[e.key.toLowerCase()] = true);
 document.addEventListener("keyup", e => keys[e.key.toLowerCase()] = false);
 
-// Enemies
-let enemies = [];
+// Spawn enemies
 function spawnEnemies() {
   enemies = [];
   for (let i = 0; i < 10; i++) {
-    const dist = 5 + Math.random() * 20;
-    const ang = Math.random() * Math.PI * 2;
     enemies.push({
-      x: Math.cos(ang) * dist,
-      z: Math.sin(ang) * dist,
+      x: Math.random() * canvas.width,
+      y: Math.random() * canvas.height,
       alive: true
     });
   }
 }
 spawnEnemies();
 
-// Shooting
+// Full auto shooting
 function shoot() {
-  const dirX = Math.cos(angle);
-  const dirZ = Math.sin(angle);
-  let hit = -1;
-  let closest = Infinity;
+  bullets.push({
+    x: px,
+    y: py,
+    dx: Math.cos(angle) * 6,
+    dy: Math.sin(angle) * 6
+  });
+}
 
-  enemies.forEach((e, i) => {
+// Game loop
+function update() {
+  const speed = 3;
+
+  // Movement
+  if (keys["w"]) py -= speed;
+  if (keys["s"]) py += speed;
+  if (keys["a"]) px -= speed;
+  if (keys["d"]) px += speed;
+
+  // Aiming with arrow keys
+  if (keys["arrowleft"]) angle -= 0.1;
+  if (keys["arrowright"]) angle += 0.1;
+
+  // Full auto
+  if (keys["f"]) {
+    if (shootCooldown <= 0) {
+      shoot();
+      shootCooldown = 1; // lower = faster
+    }
+  }
+  if (shootCooldown > 0) shootCooldown--;
+
+  // Move bullets
+  bullets.forEach(b => {
+    b.x += b.dx;
+    b.y += b.dy;
+  });
+
+  // Enemy movement
+  enemies.forEach(e => {
     if (!e.alive) return;
-    const vx = e.x - px;
-    const vz = e.z - pz;
-    const proj = vx * dirX + vz * dirZ;
-    if (proj <= 0) return;
-    const perpX = vx - proj * dirX;
-    const perpZ = vz - proj * dirZ;
-    const distSide = Math.hypot(perpX, perpZ);
-    if (distSide < 0.6 && proj < closest) {
-      closest = proj;
-      hit = i;
+    const dx = px - e.x;
+    const dy = py - e.y;
+    const dist = Math.hypot(dx, dy);
+    if (dist > 5) {
+      e.x += dx / dist * 1.2;
+      e.y += dy / dist * 1.2;
     }
   });
 
-  if (hit !== -1) {
-    enemies[hit].alive = false;
-    score++;
-    if (enemies.every(e => !e.alive)) spawnEnemies();
-  }
-}
-
-document.addEventListener("keydown", e => {
-  if (e.key.toLowerCase() === "f") shoot();
-});
-
-// Game loop
-function update(dt) {
-  const speed = 0.01 * dt;
-
-  // Movement
-  if (keys["w"]) {
-    px += Math.cos(angle) * speed;
-    pz += Math.sin(angle) * speed;
-  }
-  if (keys["s"]) {
-    px -= Math.cos(angle) * speed;
-    pz -= Math.sin(angle) * speed;
-  }
-  if (keys["a"]) {
-    px += Math.cos(angle - Math.PI/2) * speed;
-    pz += Math.sin(angle - Math.PI/2) * speed;
-  }
-  if (keys["d"]) {
-    px += Math.cos(angle + Math.PI/2) * speed;
-    pz += Math.sin(angle + Math.PI/2) * speed;
-  }
-
-  // Aiming with arrow keys
-  if (keys["arrowleft"]) angle -= 0.003 * dt;
-  if (keys["arrowright"]) angle += 0.003 * dt;
-}
-
-function render() {
-  const w = canvas.width;
-  const h = canvas.height;
-  const horizon = h * 0.5;
-
-  // Sky
-  ctx.fillStyle = "#0a0a1a";
-  ctx.fillRect(0, 0, w, horizon);
-
-  // Ground
-  ctx.fillStyle = "#111";
-  ctx.fillRect(0, horizon, w, h);
-
-  // Enemies
-  enemies.forEach(e => {
-    if (!e.alive) return;
-
-    const relX = e.x - px;
-    const relZ = e.z - pz;
-
-    const camZ = relX * Math.cos(angle) + relZ * Math.sin(angle);
-    const camX = -relX * Math.sin(angle) + relZ * Math.cos(angle);
-
-    if (camZ <= 0.2) return;
-
-    const scale = 200 / camZ;
-    const size = scale * 1.2;
-    const x = w/2 + camX * scale;
-    const y = horizon - size/2;
-
-    ctx.fillStyle = "cyan";
-    ctx.fillRect(x - size/2, y, size, size);
+  // Bullet collision
+  bullets.forEach(b => {
+    enemies.forEach(e => {
+      if (!e.alive) return;
+      if (Math.hypot(b.x - e.x, b.y - e.y) < 15) {
+        e.alive = false;
+      }
+    });
   });
 
-  ctx.fillStyle = "#fff";
-  ctx.fillText("Score: " + score, 10, 20);
+  // Respawn when all dead
+  if (enemies.every(e => !e.alive)) spawnEnemies();
 }
 
-let last = performance.now();
-function loop(now) {
-  const dt = now - last;
-  last = now;
-  update(dt);
-  render();
+function drawPlayer() {
+  ctx.save();
+  ctx.translate(px, py);
+  ctx.rotate(angle);
+
+  // Pixel stickman
+  ctx.fillStyle = "#000";
+  ctx.fillRect(-5, -10, 10, 20); // body
+  ctx.fillRect(0, -2, 15, 4);    // gun
+
+  ctx.restore();
+}
+
+function draw() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // Draw enemies
+  enemies.forEach(e => {
+    if (!e.alive) return;
+    ctx.fillStyle = "red";
+    ctx.fillRect(e.x - 10, e.y - 10, 20, 20);
+  });
+
+  // Draw bullets
+  ctx.fillStyle = "black";
+  bullets.forEach(b => {
+    ctx.fillRect(b.x - 3, b.y - 3, 6, 6);
+  });
+
+  drawPlayer();
+}
+
+function loop() {
+  update();
+  draw();
   requestAnimationFrame(loop);
 }
 loop();
